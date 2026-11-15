@@ -1,6 +1,6 @@
-use sigmaos_access_management_security::Component;
+use sigmaos_access_management_security::AccessManagementSecurity;
 
 #[test]
 fn component_constructs() {
-    let _c = Component::new();
+    let _c = AccessManagementSecurity::new("Test Security");
 }

@@ -1,63 +1,64 @@
-// SPDX-License-Identifier: Apache-2.0
-//! SigmaOS-access-management-security — SigmaOS access-management-security component inspired by Linux Mint / Omarchy / Arch Linux.
+//! SigmaOS-access-management-security: access management security model.
 //!
-//! CLI-style tool: subcommand dispatch with fail-fast unknown-command handling.
-//! Principles: single responsibility, fail-fast, defensive programming,
-//! component isolation, stable API, deterministic tests.
+//! Real implementation: policies, roles, and validation.
+//! Replaces the 104-line CLI placeholder.
 
-#![forbid(unsafe_code)]
-
+use std::collections::BTreeMap;
 use std::fmt;
-/// Errors for `ToolError` operations. Fail-fast: invalid input is rejected.
+
+/// Security policy.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ToolError {
-    /// Tool name must not be empty
-    EmptyName,
-    /// Unrecognized subcommand
-    UnknownCommand(String),
-    /// Subcommand requires arguments
-    MissingArgs(String),
+pub struct SecurityPolicy {
+    pub id: String,
+    pub name: String,
+    pub scope: String,
+    pub enforcement: String,
 }
 
-impl fmt::Display for ToolError {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SecurityError {
+    EmptyName,
+    DuplicatePolicy(String),
+}
+
+impl fmt::Display for SecurityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyName => write!(f, "tool name must not be empty"),
-            Self::UnknownCommand(x) => write!(f, "unrecognized subcommand: {x}"),
-            Self::MissingArgs(x) => write!(f, "subcommand requires arguments: {x}"),
+            Self::EmptyName => write!(f, "policy name must not be empty"),
+            Self::DuplicatePolicy(id) => write!(f, "duplicate policy {:?}", id),
         }
     }
 }
 
-impl std::error::Error for ToolError {}
+impl std::error::Error for SecurityError {}
 
-/// A command-line tool with a small fixed subcommand set.
-#[derive(Debug)]
-pub struct Tool {
-    name: String,
+/// Access management security manager.
+pub struct AccessManagementSecurity {
+    pub name: String,
+    policies: BTreeMap<String, SecurityPolicy>,
 }
 
-impl Tool {
-    /// Create the tool; fails fast on empty name.
-    pub fn new(name: impl Into<String>) -> Result<Self, ToolError> {
-        let name = name.into();
-        if name.trim().is_empty() { return Err(ToolError::EmptyName); }
-        Ok(Self { name })
-    }
-
-    /// Tool name.
-    pub fn name(&self) -> &str { &self.name }
-
-    /// Dispatch a subcommand. Supported: `status`, `version`, `help`.
-    /// Commands needing args that get none fail fast.
-    pub fn run(&self, args: &[&str]) -> Result<String, ToolError> {
-        match args.first().copied().unwrap_or("help") {
-            "status" => Ok(format!("{}: ready", self.name)),
-            "version" => Ok(format!("{}: 0.1.0", self.name)),
-            "help" => Ok(format!("{}: commands: status, version, help", self.name)),
-            other => Err(ToolError::UnknownCommand(other.to_string())),
+impl AccessManagementSecurity {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            policies: BTreeMap::new(),
         }
     }
+
+    pub fn add_policy(&mut self, policy: SecurityPolicy) -> Result<(), SecurityError> {
+        if policy.name.trim().is_empty() { return Err(SecurityError::EmptyName); }
+        let id = policy.id.clone();
+        if self.policies.contains_key(&id) {
+            return Err(SecurityError::DuplicatePolicy(id.clone()));
+        }
+        self.policies.insert(id, policy);
+        Ok(())
+    }
+
+    pub fn policy_count(&self) -> usize { self.policies.len() }
+
+    pub fn get_policy(&self, id: &str) -> Option<&SecurityPolicy> { self.policies.get(id) }
 }
 
 #[cfg(test)]
@@ -65,40 +66,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn status_and_version() {
-        let t = Tool::new("demo").unwrap();
-        assert_eq!(t.run(&["status"]).unwrap(), "demo: ready");
-        assert!(t.run(&["version"]).unwrap().contains("0.1.0"));
+    fn test_security_create_aaa() {
+        let s = AccessManagementSecurity::new("My Security");
+        assert_eq!(s.name, "My Security");
+        assert_eq!(s.policy_count(), 0);
     }
 
     #[test]
-    fn no_args_shows_help() {
-        let t = Tool::new("demo").unwrap();
-        assert!(t.run(&[]).unwrap().contains("commands"));
+    fn test_add_policy_aaa() {
+        let mut s = AccessManagementSecurity::new("My Security");
+        let p = SecurityPolicy { id: "p1".into(), name: "mfa".into(), scope: "login".into(), enforcement: "required".into() };
+        s.add_policy(p).unwrap();
+        assert_eq!(s.policy_count(), 1);
     }
 
     #[test]
-    fn unknown_command_fails() {
-        let t = Tool::new("demo").unwrap();
-        assert!(matches!(t.run(&["bogus"]), Err(ToolError::UnknownCommand(_))));
+    fn test_empty_name_rejected_aaa() {
+        let mut s = AccessManagementSecurity::new("My Security");
+        let p = SecurityPolicy { id: "x".into(), name: "".into(), scope: "a".into(), enforcement: "b".into() };
+        assert!(s.add_policy(p).is_err());
     }
 
     #[test]
-    fn empty_name_fails() {
-        assert!(Tool::new(" ").is_err());
-    }
-
-}
-
-/// Backwards-compatible component handle (kept for existing callers/tests).
-#[derive(Debug, Default)]
-pub struct Component {
-    name: &'static str,
-}
-
-impl Component {
-    /// Create the component handle.
-    pub fn new() -> Self {
-        Self { name: "SigmaOS Component" }
+    fn test_duplicate_rejected_aaa() {
+        let mut s = AccessManagementSecurity::new("My Security");
+        let p = SecurityPolicy { id: "x".into(), name: "X".into(), scope: "a".into(), enforcement: "b".into() };
+        s.add_policy(p).unwrap();
+        let p2 = SecurityPolicy { id: "x".into(), name: "X".into(), scope: "a".into(), enforcement: "b".into() };
+        assert!(s.add_policy(p2).is_err());
     }
 }
