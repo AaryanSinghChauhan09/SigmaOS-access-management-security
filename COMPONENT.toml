@@ -3,7 +3,7 @@ name = "SigmaOS-access-management-security"
 tier = 2
 stability = "scaffold"
 language = "rust"
-description = "access-management-security component"
+description = "No GitHub description is set; component scope remains unclassified."
 upstream = []
 
 [contract]
