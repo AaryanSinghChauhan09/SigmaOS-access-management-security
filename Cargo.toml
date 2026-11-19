@@ -1,10 +1,15 @@
 [package]
-name = "sigmaos_access_management_security"
+name = "SigmaOS-access-management-security"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
-description = "SigmaOS access-management-security component inspired by Linux Mint / Omarchy / Arch Linux."
+license = "Apache-2.0"
+description = "SigmaOS sigmaos_access_management_security component"
 
 [lib]
 name = "sigmaos_access_management_security"
 path = "src/lib.rs"
+
+[dependencies]
+thiserror = "1"
+
+[dev-dependencies]
